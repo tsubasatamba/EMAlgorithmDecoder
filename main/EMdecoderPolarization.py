@@ -11,15 +11,16 @@ class DecodeRunnerWithPolarization:
     def __init__(self, num_patterns):
         self.num_patterns = num_patterns
 
-        self.Ndx = 896
-        self.Ndy = 896
+        self.bin_size = 4
+        self.Ndx = (896-1)//self.bin_size+1
+        self.Ndy = (896-1)//self.bin_size+1
         self.Ndp = 2
         self.Nmx = 64
         self.Nmy = 64
         self.Nsx = 51
         self.Nsy = 51
         self.mask_pitch = 35
-        self.pixel_pitch = 2.5
+        self.pixel_pitch = 2.5*self.bin_size
         self.sky_pitch = 20
         self.detector_to_mask = 25e4
 
@@ -92,7 +93,16 @@ class DecodeRunnerWithPolarization:
         with open(filename, "r") as f:
             for row in f:
                 e_arr.append(list(map(int, row.rstrip().split())))
-        arr = np.array(e_arr).flatten()
+        nx = len(e_arr)
+        ny = len(e_arr[0])
+        e_arr_bin = np.zeros(((nx-1)//self.bin_size+1, (ny-1)//self.bin_size+1))
+        for i in range(nx):
+            for j in range(ny):
+                ii = i//self.bin_size
+                jj = j//self.bin_size
+                e_arr_bin[ii][jj] += e_arr[i][j]
+        print(len(e_arr_bin), len(e_arr_bin[0]))
+        arr = np.array(e_arr_bin).flatten()
         if sample > 0:
             arr = self.sampling_data(arr, sample, seed)
         self.EncodedImage[pattern_id, angle_ind] += arr / weight
@@ -102,12 +112,28 @@ class DecodeRunnerWithPolarization:
         with open(filenamebase + "_Htype/pattern_{}.txt".format(pattern_id), "r") as f:
             for row in f:
                 e_arr.append(list(map(int, row.rstrip().split())))
-        arr_Htype = np.array(e_arr).flatten()
+        nx = len(e_arr)
+        ny = len(e_arr[0])
+        e_arr_bin = np.zeros(((nx-1)//self.bin_size+1, (ny-1)//self.bin_size+1))
+        for i in range(nx):
+            for j in range(ny):
+                ii = i//self.bin_size
+                jj = j//self.bin_size
+                e_arr_bin[ii][jj] += e_arr[i][j]
+        arr_Htype = np.array(e_arr_bin).flatten()
         e_arr = []
         with open(filenamebase + "_Vtype/pattern_{}.txt".format(pattern_id), "r") as f:
             for row in f:
                 e_arr.append(list(map(int, row.rstrip().split())))
-        arr_Vtype = np.array(e_arr).flatten()
+        nx = len(e_arr)
+        ny = len(e_arr[0])
+        e_arr_bin = np.zeros(((nx-1)//self.bin_size+1, (ny-1)//self.bin_size+1))
+        for i in range(nx):
+            for j in range(ny):
+                ii = i//self.bin_size
+                jj = j//self.bin_size
+                e_arr_bin[ii][jj] += e_arr[i][j]
+        arr_Vtype = np.array(e_arr_bin).flatten()
 
         self.EncodedImage[pattern_id, 0] += arr_Htype / weight_Htype
         self.EncodedImage[pattern_id, 1] += arr_Vtype / weight_Vtype
@@ -218,11 +244,13 @@ class DecodeRunnerWithPolarization:
             filename_Vtype = "./parameters/{}/sky_parameters_{}_V.txt".format(dirname, loop_id)
             outfilename_I = "./pictures/{}/decoded_image_{}.png".format(dirname, loop_id)
             outfilename_P = "./pictures/{}/decoded_image_pol_{}.png".format(dirname, loop_id)
+            outfilename_Q = "./pictures/{}/decoded_image_Q_{}.png".format(dirname, loop_id)
             self.save_sky_parameters(filename_Htype, S_dist_0)
             self.save_sky_parameters(filename_Vtype, S_dist_90)
             self.save_divergence_trend("./parameters/{}/div_trend.txt".format(dirname), div_trend)
 
-            subprocess.run(["../cpp/draw_decoded_image_polarization", filename_Htype, filename_Vtype, outfilename_I, outfilename_P, str(self.Nsx), str(self.Nsy), str(self.sky_pitch), str(1.0)])
+            cpp_exec_file = os.environ['HOME'] + "/software/EMAlgorithmDecoder/cpp/draw_decoded_image_polarization_2"
+            subprocess.run([cpp_exec_file, filename_Htype, filename_Vtype, outfilename_I, outfilename_P, str(self.Nsx), str(self.Nsy), str(self.sky_pitch), str(1.0), outfilename_Q])
             loop_id += 1
         
         print("end.")

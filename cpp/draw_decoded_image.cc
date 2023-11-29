@@ -3,7 +3,6 @@
 #include <iostream>
 #include <fstream>
 
-
 #include <TDirectoryFile.h>
 #include <TFile.h>
 #include <TCanvas.h>
@@ -13,6 +12,7 @@
 #include <TStyle.h>
 #include <TPad.h>
 
+#include "TH1.h"
 // typedef std::string<std::string<double>> S;
 
 std::vector<std::vector<double>> read_sky_parameters(std::string filename, int Nsx, int Nsy) {

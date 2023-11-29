@@ -11,14 +11,15 @@ class DecodeRunner:
     def __init__(self, num_patterns):
         self.num_patterns = num_patterns
 
-        self.Ndx = 896
-        self.Ndy = 896
+        self.bin_size = 4
+        self.Ndx = (896-1)//self.bin_size+1
+        self.Ndy = (896-1)//self.bin_size+1
         self.Nmx = 64
         self.Nmy = 64
         self.Nsx = 51
         self.Nsy = 51
         self.mask_pitch = 35
-        self.pixel_pitch = 2.5
+        self.pixel_pitch = 2.5*self.bin_size
         self.sky_pitch = 20
         self.detector_to_mask = 25e4
 
@@ -49,6 +50,7 @@ class DecodeRunner:
         return arcsec / 3600 / 180 * math.pi
 
     def construct_matrix(self, attenuation=0.02, narrow=False):
+        print("construct start")
         sky_pos_X = self.detector_to_mask * np.tan(self.arcsec_to_rad(self.sky_X))
         sky_pos_Y = self.detector_to_mask * np.tan(self.arcsec_to_rad(self.sky_Y))
 
@@ -57,9 +59,12 @@ class DecodeRunner:
         sky_min_y = np.min(sky_pos_Y)
         sky_max_y = np.max(sky_pos_Y)
 
+        print("construct 0")
         pattern_flatten = [np.append(self.Pattern[pattern_id].flatten().astype(bool), False) for pattern_id in range(self.num_patterns)]
+        print("construct 1")
 
         self.Mat = np.full((self.num_patterns, self.Nsx*self.Nsy, self.Ndx*self.Ndy), attenuation)
+        print("construct 2")
         for sky_i, (sky_x, sky_y) in enumerate(zip(sky_pos_X, sky_pos_Y)):
             mask_X = np.round((self.detector_X + sky_x) / self.mask_pitch).astype(int)
             mask_Y = np.round((self.detector_Y + sky_y) / self.mask_pitch).astype(int)
@@ -80,7 +85,16 @@ class DecodeRunner:
         with open(filename, "r") as f:
             for row in f:
                 e_arr.append(list(map(int, row.rstrip().split())))
-        self.EncodedImage[pattern_id] += np.array(e_arr).flatten()
+        nx = len(e_arr)
+        ny = len(e_arr[0])
+        e_arr_bin = np.zeros(((nx-1)//self.bin_size+1, (ny-1)//self.bin_size+1))
+        for i in range(nx):
+            for j in range(ny):
+                ii = i//self.bin_size
+                jj = j//self.bin_size
+                e_arr_bin[ii][jj] += e_arr[i][j]
+        print(len(e_arr_bin), len(e_arr_bin[0]))
+        self.EncodedImage[pattern_id] += np.array(e_arr_bin).flatten()
         print(np.sum(self.EncodedImage))
 
     def filter_encoded_image(self, number, seed):
@@ -190,7 +204,10 @@ class DecodeRunner:
             self.save_divergence_trend("./parameters/{}/div_trend.txt".format(dirname), div_trend)
             # if div < finish_delta:
                 # break
-            subprocess.run(["../cpp/draw_decoded_image", filename_sky_parameters, filename_sky_image, str(self.Nsx), str(self.Nsy), str(self.sky_pitch)])
+            cpp_exec_file = os.environ['HOME'] + "/software/EMAlgorithmDecoder/cpp/draw_decoded_image"
+            subprocess.run([cpp_exec_file, filename_sky_parameters, filename_sky_image, str(self.Nsx), str(self.Nsy), str(self.sky_pitch)])
             loop_id += 1
         
         print("end.")
+
+        
